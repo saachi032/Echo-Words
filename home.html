@@ -19,12 +19,12 @@
             align-items: center;
         }
         header {
-            width: 100%;
+            width: 95%;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: rgba(0, 0, 50, 0.9);
-            padding: 30px 50px; 
+            padding: 20px 50px; 
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
             position: fixed;
             top: 0;
@@ -32,31 +32,36 @@
             z-index: 1000;
         }
         .logo {
-            font-size: 40px; 
+            font-size: 40px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 2px;
         }
+        nav {
+            max-width: 50%; /* Limits navigation width to prevent overflow */
+        }
         nav ul {
             list-style: none;
             display: flex;
-            gap: 10px;
+            gap: 20px; /* Reduced gap */
             padding: 0;
             margin: 0;
+            flex-shrink: 1;
         }
         nav ul li a {
             color: white;
             text-decoration: none;
             font-weight: 600;
-            font-size: 18px; 
+            font-size: 16px; /* Reduced font size */
             transition: color 0.3s ease;
+            white-space: nowrap; /* Prevents text wrapping */
         }
         nav ul li a:hover {
             color: #ffcc00;
         }
         .search-section {
             text-align: center;
-            margin-top: 140px; 
+            margin-top: 140px;
         }
         .search-section input {
             width: 50%;
@@ -159,6 +164,28 @@
             font-weight: bold;
         }
 
+        /* Media Query for Responsiveness */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                padding: 15px 20px;
+            }
+            nav {
+                max-width: 100%; /* Full width on smaller screens */
+            }
+            nav ul {
+                flex-direction: column;
+                gap: 15px;
+                margin-top: 15px;
+                text-align: center;
+            }
+            .logo {
+                font-size: 32px;
+            }
+            .search-section input {
+                width: 80%;
+            }
+        }
     </style>
 </head>
 <body>
