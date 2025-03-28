@@ -31,7 +31,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,10 +44,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: linear-gradient(to right, #1e3c72, #2a5298, #6e8efb, #a777e3);
             color: white;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
             margin: 0;
+            padding: 20px;
         }
         .request-container {
             background: rgba(255, 255, 255, 0.2);
@@ -66,11 +65,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-radius: 10px;
             text-align: center;
         }
+        input {
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            color: black;
+        }
         button {
             background-color: #ffcc00;
             font-size: 18px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        button:hover {
+            background-color: #ffaa00;
+        }
+        .requested-books-container {
+            margin-top: 40px;
+            width: 80%;
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        .book-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .book-item img {
+            width: 50px;
+            height: auto;
+            border-radius: 5px;
+            margin-right: 15px;
+        }
+        .book-info {
+            text-align: left;
+            flex-grow: 1;
         }
     </style>
+    <script>
+        function showRequestedBooks() {
+            document.getElementById("requestedBooks").style.display = "block";
+        }
+        function downloadAllBooks() {
+            alert("Proceeding to download all requested books. Please follow the instructions in the next step.");
+        }
+    </script>
 </head>
 <body>
     <div class="request-container">
@@ -82,6 +131,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <input type="file" name="book_cover" required>
             <button type="submit">Submit Request</button>
         </form>
+        <br>
+        <a href="#" onclick="showRequestedBooks()" style="color: white; text-decoration: none;">View My Requested Books</a>
+    </div>
+
+    <div class="requested-books-container" id="requestedBooks">
+        <h2>Requested Books</h2>
+        <div class="book-item">
+            <img src="https://m.media-amazon.com/images/I/81YOuOGFCJL.jpg" alt="Sample Book">
+            <div class="book-info">
+                <strong>Book Name:</strong> Example Book<br>
+                <strong>Author:</strong> John Doe
+            </div>
+        </div>
+        <div class="book-item">
+            <img src="https://m.media-amazon.com/images/I/71aFt4+OTOL.jpg" alt="Sample Book">
+            <div class="book-info">
+                <strong>Book Name:</strong> Another Book<br>
+                <strong>Author:</strong> Jane Smith
+            </div>
+        </div>
+        <button onclick="downloadAllBooks()" style="margin-top: 20px;">Download All</button>
     </div>
 </body>
 </html>
+
