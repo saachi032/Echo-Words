@@ -12,6 +12,29 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Update hits when a book is opened
+if (isset($_POST['file_path'])) {
+    $file_path = $conn->real_escape_string($_POST['file_path']);
+    $sql = "UPDATE books SET hits = hits + 1 WHERE file_path = '$file_path'";
+    if ($conn->query($sql) === TRUE) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => $conn->error]);
+    }
+    exit;
+}
+
+// Get all book hit counts
+if (isset($_GET['get_hits'])) {
+    $result = $conn->query("SELECT file_path, hits FROM books");
+    $hits = [];
+    while ($row = $result->fetch_assoc()) {
+        $hits[$row['file_path']] = $row['hits'];
+    }
+    echo json_encode($hits);
+    exit;
+}
+
 $result = $conn->query("SELECT * FROM books");
 $books = [];
 while ($row = $result->fetch_assoc()) {
@@ -25,8 +48,10 @@ while ($row = $recommendations->fetch_assoc()) {
 }
 
 function getBookCover($title) {
-    $filename = "covers/" . str_replace(" ", "_", $title) . ".jpg"; 
-    return file_exists($filename) ? $filename : "covers/default.jpg"; 
+    $filename = str_replace(' ', '_', $title);
+    $filename = preg_replace('/[^A-Za-z0-9_\-]/', '', $filename);
+    $path = "covers/" . $filename . ".jpg";
+    return file_exists($path) ? $path : "covers/default.jpg";
 }
 ?>
 <!DOCTYPE html>
@@ -35,6 +60,8 @@ function getBookCover($title) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EchoWords - Audiobooks</title>
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
 
@@ -47,30 +74,35 @@ function getBookCover($title) {
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
         }
         header {
-    width: 95%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(0, 0, 50, 0.9);
-    padding: 30px 50px;
-    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-}
-
-.logo {
-    font-size: 50px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: white;
-}
-
-        
+            width: 95%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 50, 0.9);
+            padding: 30px 50px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .logo {
+            font-size: 50px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        .logo:hover {
+            color: #ffcc00;
+        }
         nav {
             flex-grow: 1;
             display: flex;
@@ -129,26 +161,43 @@ function getBookCover($title) {
             margin-top: 50px;
             padding: 10px 20px;
             text-align: center;
+            flex: 1 0 auto;
+            width: 100%;
         }
         .book-list {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 30px;
+            width: 100%;
+            padding: 0 10px;
+            box-sizing: border-box;
         }
         .book {
             background: rgba(255, 255, 255, 0.1);
             padding: 20px;
             border-radius: 20px;
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
-            width: 150px;
+            width: 200px;
             text-align: center;
             transition: transform 0.3s ease;
+            cursor: pointer;
+            flex: 0 0 auto;
+            box-sizing: border-box;
         }
         .book img {
             width: 100%;
             height: auto;
             border-radius: 10px;
+        }
+        .book .hits {
+            font-size: 14px;
+            color: #ffcc00;
+            margin-top: 5px;
+            transition: color 0.3s ease;
+        }
+        .book:hover .hits {
+            color: #ffaa00;
         }
         .book:hover {
             transform: scale(1.1);
@@ -157,8 +206,8 @@ function getBookCover($title) {
             text-align: center;
             padding: 20px;
             background: rgba(0, 0, 50, 0.9);
-            margin-top: 50px;
             width: 100%;
+            flex-shrink: 0;
         }
         .logout-btn {
             padding: 10px 20px;
@@ -178,14 +227,180 @@ function getBookCover($title) {
             margin-top: 20px;
             display: none;
         }
+        .pdf-viewer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #1e1e2f;
+            z-index: 2000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .pdf-viewer.active {
+            opacity: 1;
+        }
+        .pdf-header {
+            width: 100%;
+            background: rgba(0, 0, 50, 0.9);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: -60px;
+            left: 0;
+            z-index: 2100;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+            transition: top 0.3s ease;
+        }
+        .pdf-header.active {
+            top: 0;
+        }
+        .pdf-header h2 {
+            margin: 0;
+            font-size: 24px;
+            color: #ffcc00;
+            margin-left: 10px;
+        }
+        .close-btn {
+            margin-right: 30px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .close-btn:hover {
+            color: #ff4444;
+        }
+        .pdf-controls {
+            position: fixed;
+            bottom: -60px;
+            background: rgba(0, 0, 50, 0.9);
+            padding: 10px 70px;
+            border-radius: 10px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0px -4px 10px rgba(0, 0, 0, 0.3);
+            z-index: 2100;
+            transition: bottom 0.3s ease;
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 600px;
+            box-sizing: border-box;
+        }
+        .pdf-controls.active {
+            bottom: 20px;
+        }
+        .pdf-controls button {
+            padding: 10px 15px;
+            background: #ffcc00;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            font-size: 16px;
+            min-width: 95px;
+            text-align: center;
+        }
+        .pdf-controls button:hover {
+            background: #ffaa00;
+            transform: scale(1.05);
+        }
+        .pdf-controls #pageInfo {
+            flex: 0 0 150px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pdf-controls #pageInput {
+            flex: 0 0 50px;
+            padding: 2px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            text-align: center;
+            margin: 0 2px;
+            width: 50px;
+            box-sizing: border-box;
+        }
+        .pdf-controls #pageTotal {
+            flex: 0 0 40px;
+            text-align: center;
+        }
+        .pdf-controls #zoomLevel {
+            flex: 0 0 120px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pdf-controls span {
+            color: white;
+            font-size: 16px;
+        }
+        @media (max-width: 768px) {
+            .pdf-header h2 {
+                font-size: 18px;
+            }
+            .close-btn {
+                font-size: 20px;
+            }
+            .pdf-controls {
+                padding: 8px 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+                min-width: 300px;
+            }
+            .pdf-controls button {
+                padding: 8px 12px;
+                font-size: 14px;
+                min-width: 60px;
+            }
+            .pdf-controls #pageInfo {
+                flex: 0 0 120px;
+                font-size: 14px;
+            }
+            .pdf-controls #pageInput {
+                flex: 0 0 30px;
+                font-size: 14px;
+                padding: 1px;
+                width: 30px;
+            }
+            .pdf-controls #pageTotal {
+                flex: 0 0 30px;
+                font-size: 14px;
+            }
+            .pdf-controls #zoomLevel {
+                flex: 0 0 100px;
+                font-size: 14px;
+            }
+            .book {
+                width: 120px;
+            }
+        }
     </style>
 </head>
 <body>
     <header>
-        <div class="logo">EchoWords</div>
+        <a href="loggedinhome.php" class="logo">EchoWords</a>
         <nav>
             <ul>
-                <li><a href="loggedinhome.php">Home</a></li>
                 <li><a href="myacc.php">My Account</a></li>
                 <li><a href="request_book.php">Request a Book</a></li>
                 <?php if (isset($_SESSION["user"])): ?>
@@ -208,11 +423,10 @@ function getBookCover($title) {
             <h2>Available Books</h2>
             <div class="book-list" id="bookList">
                 <?php foreach ($books as $book): ?>
-                    <div class="book">
-                        <a href="<?= htmlspecialchars($book["file_path"]) ?>" target="_blank">
-                            <img src="<?= getBookCover($book["title"]) ?>" alt="<?= htmlspecialchars($book["title"]) ?>">
-                        </a>
-                        <p class="book-title"><?= htmlspecialchars($book["title"]) ?></p>
+                    <div class="book" data-file-path="<?= htmlspecialchars($book['file_path']) ?>" onclick="openPDF('<?= htmlspecialchars($book['file_path']) ?>', '<?= htmlspecialchars($book['title']) ?>')">
+                        <img src="<?= getBookCover($book['title']) ?>" alt="<?= htmlspecialchars($book['title']) ?>">
+                        <p class="book-title"><?= htmlspecialchars($book['title']) ?></p>
+                        <p class="hits" data-file-path="<?= htmlspecialchars($book['file_path']) ?>">Hits: <?= htmlspecialchars($book['hits']) ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -223,18 +437,226 @@ function getBookCover($title) {
             <h2>This Week's Recommendations</h2>
             <div class="book-list">
                 <?php foreach ($recommended_books as $book): ?>
-                    <div class="book">
-                        <a href="<?= htmlspecialchars($book["file_path"]) ?>" target="_blank">
-                            <img src="<?= getBookCover($book["title"]) ?>" alt="<?= htmlspecialchars($book["title"]) ?>">
-                        </a>
-                        <p><?= htmlspecialchars($book["title"]) ?></p>
+                    <div class="book" data-file-path="<?= htmlspecialchars($book['file_path']) ?>" onclick="openPDF('<?= htmlspecialchars($book['file_path']) ?>', '<?= htmlspecialchars($book['title']) ?>')">
+                        <img src="<?= getBookCover($book['title']) ?>" alt="<?= htmlspecialchars($book['title']) ?>">
+                        <p><?= htmlspecialchars($book['title']) ?></p>
+                        <p class="hits" data-file-path="<?= htmlspecialchars($book['file_path']) ?>">Hits: <?= htmlspecialchars($book['hits']) ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
         </section>
     </main>
 
+    <!-- Full-Screen PDF Viewer -->
+    <div class="pdf-viewer" id="pdfViewerContainer">
+        <div class="pdf-header" id="pdfHeader">
+            <h2 id="pdfTitle">Book Title</h2>
+            <button class="close-btn" onclick="closePDF()">×</button>
+        </div>
+        <canvas id="pdfViewer"></canvas>
+        <div class="pdf-controls" id="pdfControls">
+            <button onclick="previousPage()">Previous</button>
+            <div id="pageInfo">
+                Page <input type="number" id="pageInput" min="1"> of <span id="pageTotal">1</span>
+            </div>
+            <button onclick="nextPage()">Next</button>
+            <button onclick="zoomOut()">−</button>
+            <button onclick="zoomIn()">+</button>
+            <button onclick="resetZoom()">Reset</button>
+            <span id="zoomLevel">100%</span>
+            <button onclick="downloadPDF()">Download</button>
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2025 EchoWords. All rights reserved.</p>
+    </footer>
+
     <script>
+        // PDF.js Viewer Logic
+        let pdfDoc = null;
+        let pageNum = 1;
+        let pageRendering = false;
+        let pageNumPending = null;
+        let scale = 1.0;
+        let initialScale = 1.0;
+        let canvas = document.getElementById('pdfViewer');
+        let ctx = canvas.getContext('2d');
+        let currentPDFUrl = '';
+
+        function renderPage(num) {
+            pageRendering = true;
+            console.log('Rendering page:', num);
+            pdfDoc.getPage(num).then(page => {
+                const pixelRatio = window.devicePixelRatio || 1;
+                let viewport = page.getViewport({ scale: 1 });
+
+                const pdfAspectRatio = viewport.width / viewport.height;
+                const maxWidth = window.innerWidth * 0.95;
+                const maxHeight = (window.innerHeight - 120) * 0.95;
+                const screenAspectRatio = maxWidth / maxHeight;
+
+                let baseScale;
+                if (pdfAspectRatio > screenAspectRatio) {
+                    baseScale = maxWidth / viewport.width;
+                } else {
+                    baseScale = maxHeight / viewport.height;
+                }
+
+                viewport = page.getViewport({ scale: baseScale * scale * pixelRatio });
+
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.style.width = `${viewport.width / pixelRatio}px`;
+                canvas.style.height = `${viewport.height / pixelRatio}px`;
+
+                canvas.style.position = 'absolute';
+                canvas.style.left = `${(window.innerWidth - (viewport.width / pixelRatio)) / 2}px`;
+                canvas.style.top = `60px`;
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+                page.render(renderContext).promise.then(() => {
+                    pageRendering = false;
+                    if (pageNumPending !== null) {
+                        renderPage(pageNumPending);
+                        pageNumPending = null;
+                    }
+                    const totalPages = pdfDoc.numPages || '?';
+                    document.getElementById('pageInput').value = num;
+                    document.getElementById('pageTotal').textContent = totalPages;
+                    document.getElementById('zoomLevel').textContent = `${Math.round(scale * 100)}%`;
+                    localStorage.setItem('lastPage_' + currentPDFUrl, num);
+                }).catch(err => {
+                    console.error('Error rendering page:', err);
+                    document.getElementById('pageInput').value = num;
+                    document.getElementById('pageTotal').textContent = '?';
+                });
+            }).catch(err => {
+                console.error('Error loading page:', err);
+                document.getElementById('pageInput').value = num;
+                document.getElementById('pageTotal').textContent = '?';
+            });
+        }
+
+        function queueRenderPage(num) {
+            if (pageRendering) {
+                pageNumPending = num;
+            } else {
+                renderPage(num);
+            }
+        }
+
+        function openPDF(url, title) {
+            currentPDFUrl = url;
+            // Update hits in database
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'file_path=' + encodeURIComponent(url)
+            }).then(response => response.json())
+              .then(data => {
+                  if (!data.success) console.error('Failed to update hits:', data.error);
+                  // Trigger immediate hit update after increment
+                  updateHits();
+              }).catch(error => console.error('Error updating hits:', error));
+
+            pdfjsLib.getDocument(url).promise.then(pdf => {
+                pdfDoc = pdf;
+                const lastPage = localStorage.getItem('lastPage_' + url);
+                pageNum = lastPage && !isNaN(lastPage) && parseInt(lastPage) <= pdf.numPages ? parseInt(lastPage) : 1;
+                scale = 1.0;
+                initialScale = 1.0;
+                document.getElementById('pdfTitle').textContent = title;
+                const viewer = document.getElementById('pdfViewerContainer');
+                viewer.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                setTimeout(() => {
+                    viewer.classList.add('active');
+                    document.getElementById('pdfHeader').classList.add('active');
+                    document.getElementById('pdfControls').classList.add('active');
+                }, 10);
+                document.querySelector('header').style.display = 'none';
+                document.querySelector('main').style.display = 'none';
+                document.querySelector('footer').style.display = 'none';
+                renderPage(pageNum);
+            }).catch(err => {
+                console.error('Error loading PDF:', err);
+                alert('Failed to load the PDF. Please try again.');
+            });
+        }
+
+        function closePDF() {
+            const viewer = document.getElementById('pdfViewerContainer');
+            viewer.classList.remove('active');
+            document.getElementById('pdfHeader').classList.remove('active');
+            document.getElementById('pdfControls').classList.remove('active');
+            document.body.style.overflow = '';
+            setTimeout(() => {
+                viewer.style.display = 'none';
+                document.querySelector('header').style.display = 'flex';
+                document.querySelector('main').style.display = 'block';
+                document.querySelector('footer').style.display = 'block';
+                pdfDoc = null;
+                pageNum = 1;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Optionally clear bookmark on close
+                // localStorage.removeItem('lastPage_' + currentPDFUrl);
+            }, 300);
+        }
+
+        function previousPage() {
+            if (pageNum <= 1) return;
+            pageNum--;
+            queueRenderPage(pageNum);
+        }
+
+        function nextPage() {
+            if (pageNum >= pdfDoc.numPages) return;
+            pageNum++;
+            queueRenderPage(pageNum);
+        }
+
+        function goToPage() {
+            const input = document.getElementById('pageInput');
+            const page = parseInt(input.value);
+            const totalPages = pdfDoc.numPages || 0;
+            console.log('Attempting to go to page:', page, 'Total pages:', totalPages);
+            if (page >= 1 && page <= totalPages && !isNaN(page)) {
+                pageNum = page;
+                queueRenderPage(pageNum);
+                console.log('Navigated to page:', pageNum);
+            } else {
+                alert('Please enter a valid page number between 1 and ' + totalPages);
+                console.log('Invalid page number entered');
+                input.value = pageNum;
+            }
+        }
+
+        function zoomIn() {
+            if (scale >= 3.0) return;
+            scale *= 1.2;
+            queueRenderPage(pageNum);
+        }
+
+        function zoomOut() {
+            if (scale <= 0.4) return;
+            scale /= 1.2;
+            queueRenderPage(pageNum);
+        }
+
+        function resetZoom() {
+            scale = initialScale;
+            queueRenderPage(pageNum);
+        }
+
+        function downloadPDF() {
+            window.open(currentPDFUrl, '_blank');
+        }
+
+        // Search Functionality
         function searchBooks() {
             const input = document.getElementById("searchInput").value.toLowerCase();
             const books = document.querySelectorAll("#bookList .book");
@@ -252,12 +674,65 @@ function getBookCover($title) {
                 }
             });
 
-            // Hide recommendations if there's input
             recommendations.style.display = input ? "none" : "block";
-
-            // Show/hide 'no results' message
             noResults.style.display = matches === 0 && input ? "block" : "none";
-        } 
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (pdfDoc && document.getElementById('pdfViewerContainer').style.display === 'flex') {
+                queueRenderPage(pageNum);
+            }
+        });
+
+        // Keyboard Shortcuts and Enter key for page navigation
+        document.addEventListener('keydown', (e) => {
+            const viewer = document.getElementById('pdfViewerContainer');
+            if (viewer.style.display === 'flex') {
+                if (e.key === 'ArrowLeft') previousPage();
+                if (e.key === 'ArrowRight') nextPage();
+                if (e.key === '+') zoomIn();
+                if (e.key === '-') zoomOut();
+                if (e.key === 'Escape') closePDF();
+                if (e.key === 'Enter') {
+                    goToPage();
+                }
+            }
+        });
+
+        // Input event to track typing (no render)
+        const pageInput = document.getElementById('pageInput');
+        pageInput.addEventListener('input', () => {
+            console.log('Manual input:', pageInput.value);
+        });
+
+        // Real-time hit update function
+        function updateHits() {
+            fetch(window.location.href + '?get_hits=true')
+                .then(response => response.json())
+                .then(hits => {
+                    console.log('Fetched hits:', hits); // Debug log
+                    const books = document.querySelectorAll('.book');
+                    books.forEach(book => {
+                        const filePath = book.getAttribute('data-file-path');
+                        const hitsElement = book.querySelector('.hits');
+                        if (hits[filePath] !== undefined) {
+                            const currentHits = parseInt(hitsElement.textContent.match(/\d+/) || 0);
+                            const newHits = parseInt(hits[filePath]);
+                            if (newHits !== currentHits) {
+                                hitsElement.textContent = `Hits: ${newHits}`;
+                            }
+                        }
+                    });
+                })
+                .catch(error => console.error('Error fetching hits:', error));
+        }
+
+        // Start real-time updates (every 5 seconds)
+        setInterval(updateHits, 5000);
+
+        // Initial update on page load
+        window.addEventListener('load', updateHits);
     </script>
 </body>
 </html>

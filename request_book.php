@@ -39,6 +39,7 @@ session_start();
     text-transform: uppercase;
     letter-spacing: 2px;
     color: white;
+    text-decoration: none;
 }
 
         nav {
@@ -117,10 +118,10 @@ session_start();
 </head>
 <body>
     <header>
-        <div class="logo">EchoWords</div>
+        <a href="loggedinhome.php" class="logo">EchoWords</a>
         <nav>
             <ul>
-                <li><a href="loggedinhome.php">Home</a></li>
+                <!-- <li><a href="loggedinhome.php">Home</a></li> -->
                 <li><a href="myacc.php">My Account</a></li>
                 <li><a href="request_book.php">Request a Book</a></li>
                 <?php if (isset($_SESSION["user"])): ?>

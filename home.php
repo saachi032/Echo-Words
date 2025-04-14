@@ -58,6 +58,7 @@ function getBookCover($title) {
     text-transform: uppercase;
     letter-spacing: 2px;
     color: white;
+    text-decoration: none;
 }
 
     nav {
@@ -238,10 +239,10 @@ function getBookCover($title) {
 </head>
 <body>
   <header>
-    <div class="logo">EchoWords</div>
+    <a href="home.php" class="logo">EchoWords</a>
     <nav>
       <ul>
-        <li><a href="#">Home</a></li>
+        <!-- <li><a href="#">Home</a></li> -->
         <li><a href="login.php">Login</a></li>
         <li><a href="signup.php">Sign Up</a></li>
       </ul>

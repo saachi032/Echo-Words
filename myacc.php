@@ -60,6 +60,7 @@ $stmt->close();
     text-transform: uppercase;
     letter-spacing: 2px;
     color: white;
+    text-decoration: none;
 }
 
 
@@ -81,7 +82,7 @@ $stmt->close();
             font-weight: 600;
             font-size: 16px;
             transition: color 0.3s ease;
-            padding: 10px 20px;
+            /* padding: 10px 20px; */
             border-radius: 5px;
         }
 
@@ -184,10 +185,12 @@ $stmt->close();
 </head>
 <body>
     <header>
-        <div class="logo">EchoWords</div>
+    <a href="loggedinhome.php" class="logo">EchoWords</a>
         <nav>
             <ul>
-                <li><a href="loggedinhome.php">Home</a></li>
+                <!-- <li><a href="loggedinhome.php">Home</a></li> -->
+                <li><a href="myacc.php">My Account</a></li>
+                <li><a href="request_book.php">Request a Book</a></li>
                 <li><a href="logout.php" class="logout-btn">Logout</a></li>
             </ul>
         </nav>
