@@ -1,5 +1,3 @@
-
-
 <?php
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -31,7 +29,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["signup"])) {
         die("Error: " . $stmt->error); // Show exact SQL error
     }
 
-    
     $stmt->close();
 }
 ?>
@@ -121,6 +118,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["signup"])) {
         button:hover {
             background: #ffaa00;
         }
+        .error-msg {
+            font-size: 12px;
+            color: #ff4444;
+            display: none;
+            width: 85%;
+            text-align: left;
+            margin-top: 2px;
+        }
+        .error {
+            border: 2px solid #ff4444;
+            background-color: #ffebee;
+        }
         .login-link {
             margin-top: 15px;
         }
@@ -133,7 +142,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["signup"])) {
         </div>
         <div class="signup-right">
             <h2>Create Account</h2>
-            <form action="signup.php" method="POST">
+            <form id="signupForm" action="signup.php" method="POST">
                 <label for="first-name">First Name</label>
                 <input type="text" id="first-name" name="first_name" placeholder="First Name" required>
 
@@ -142,20 +151,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["signup"])) {
 
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" placeholder="Email" required>
+                <span id="emailError" class="error-msg"></span>
 
                 <label for="phone">Phone Number</label>
                 <input type="tel" id="phone" name="phone" placeholder="Phone Number" required>
+                <span id="phoneError" class="error-msg"></span>
 
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" placeholder="Password" required>
+                <span id="passwordError" class="error-msg"></span>
 
                 <label for="confirm-password">Confirm Password</label>
                 <input type="password" id="confirm-password" name="confirm_password" placeholder="Confirm Password" required>
+                <span id="confirmPasswordError" class="error-msg"></span>
 
                 <button type="submit" name="signup">Create Account</button>
             </form>
             <p class="login-link">Already have an account? <a href="login.php">Login</a></p>
         </div>
     </div>
+    <script>
+        document.getElementById('signupForm').addEventListener('submit', function(e) {
+            let isValid = true;
+           
+            // Clear previous errors
+            document.querySelectorAll('.error-msg').forEach(el => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('input').forEach(el => {
+                el.classList.remove('error');
+            });
+
+            // Email validation
+            const email = document.getElementById('email');
+            const emailError = document.getElementById('emailError');
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+                emailError.textContent = 'Please enter a valid email (name@domain.com)';
+                emailError.style.display = 'block';
+                email.classList.add('error');
+                isValid = false;
+            }
+
+            // Phone validation
+            const phone = document.getElementById('phone');
+            const phoneError = document.getElementById('phoneError');
+            if (!/^\d{10}$/.test(phone.value)) {
+                phoneError.textContent = 'Phone number must be 10 digits';
+                phoneError.style.display = 'block';
+                phone.classList.add('error');
+                isValid = false;
+            }
+
+            // Password validation
+            const password = document.getElementById('password');
+            const passwordError = document.getElementById('passwordError');
+            if (password.value.length < 6) {
+                passwordError.textContent = 'Password must be at least 6 characters';
+                passwordError.style.display = 'block';
+                password.classList.add('error');
+                isValid = false;
+            }
+
+            // Confirm password
+            const confirmPassword = document.getElementById('confirm-password');
+            const confirmPasswordError = document.getElementById('confirmPasswordError');
+            if (password.value !== confirmPassword.value) {
+                confirmPasswordError.textContent = 'Passwords do not match';
+                confirmPasswordError.style.display = 'block';
+                confirmPassword.classList.add('error');
+                isValid = false;
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+            }
+        });
+    </script>
 </body>
 </html>

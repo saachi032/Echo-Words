@@ -12,6 +12,32 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Fetch username for greeting
+$greeting = '';
+$username = 'User';
+if (isset($_SESSION["user"]) && isset($_SESSION["email"])) {
+    $email = $_SESSION["email"];
+    $query = "SELECT fname FROM user WHERE email = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->bind_result($fname);
+    if ($stmt->fetch()) {
+        $username = htmlspecialchars($fname);
+    }
+    $stmt->close();
+
+    // Determine greeting based on current hour
+    $hour = (int)date('H');
+    if ($hour >= 0 && $hour < 12) {
+        $greeting = "Good Morning";
+    } elseif ($hour >= 12 && $hour < 17) {
+        $greeting = "Good Afternoon";
+    } else {
+        $greeting = "Good Evening";
+    }
+}
+
 // Update hits when a book is opened
 if (isset($_POST['file_path'])) {
     $file_path = $conn->real_escape_string($_POST['file_path']);
@@ -54,13 +80,13 @@ function getBookCover($title) {
     return file_exists($path) ? $path : "covers/default.jpg";
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EchoWords - Audiobooks</title>
-    <!-- PDF.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
@@ -83,7 +109,7 @@ function getBookCover($title) {
             justify-content: space-between;
             align-items: center;
             background: rgba(0, 0, 50, 0.9);
-            padding: 30px 50px;
+            padding: 20px 50px;
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
             position: fixed;
             top: 0;
@@ -102,6 +128,14 @@ function getBookCover($title) {
         }
         .logo:hover {
             color: #ffcc00;
+        }
+        .greeting-section {
+            font-size: 50px;
+            font-weight: 900;
+            color: white;
+            text-align: center;
+            margin-top: 160px;
+            margin-bottom: 20px;
         }
         nav {
             flex-grow: 1;
@@ -130,7 +164,7 @@ function getBookCover($title) {
         }
         .search-section {
             text-align: center;
-            margin-top: 200px;
+            margin-top: 20px;
         }
         .search-section input {
             width: 50%;
@@ -393,6 +427,10 @@ function getBookCover($title) {
             .book {
                 width: 120px;
             }
+            .greeting-section {
+                font-size: 18px;
+                margin-bottom: 15px;
+            }
         }
     </style>
 </head>
@@ -413,6 +451,9 @@ function getBookCover($title) {
         </nav>
     </header>
 
+    <?php if ($greeting && $username): ?>
+        <section class="greeting-section"><?php echo $greeting . ', ' . $username.'!'; ?></section>
+    <?php endif; ?>
     <section class="search-section">
         <input type="text" id="searchInput" placeholder="Search for books..." oninput="searchBooks()">
         <button onclick="searchBooks()">Search</button>
@@ -447,7 +488,6 @@ function getBookCover($title) {
         </section>
     </main>
 
-    <!-- Full-Screen PDF Viewer -->
     <div class="pdf-viewer" id="pdfViewerContainer">
         <div class="pdf-header" id="pdfHeader">
             <h2 id="pdfTitle">Book Title</h2>
@@ -473,7 +513,6 @@ function getBookCover($title) {
     </footer>
 
     <script>
-        // PDF.js Viewer Logic
         let pdfDoc = null;
         let pageNum = 1;
         let pageRendering = false;
@@ -551,7 +590,6 @@ function getBookCover($title) {
 
         function openPDF(url, title) {
             currentPDFUrl = url;
-            // Update hits in database
             fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -559,7 +597,6 @@ function getBookCover($title) {
             }).then(response => response.json())
               .then(data => {
                   if (!data.success) console.error('Failed to update hits:', data.error);
-                  // Trigger immediate hit update after increment
                   updateHits();
               }).catch(error => console.error('Error updating hits:', error));
 
@@ -602,8 +639,6 @@ function getBookCover($title) {
                 pdfDoc = null;
                 pageNum = 1;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // Optionally clear bookmark on close
-                // localStorage.removeItem('lastPage_' + currentPDFUrl);
             }, 300);
         }
 
@@ -656,7 +691,6 @@ function getBookCover($title) {
             window.open(currentPDFUrl, '_blank');
         }
 
-        // Search Functionality
         function searchBooks() {
             const input = document.getElementById("searchInput").value.toLowerCase();
             const books = document.querySelectorAll("#bookList .book");
@@ -678,14 +712,12 @@ function getBookCover($title) {
             noResults.style.display = matches === 0 && input ? "block" : "none";
         }
 
-        // Handle window resize
         window.addEventListener('resize', () => {
             if (pdfDoc && document.getElementById('pdfViewerContainer').style.display === 'flex') {
                 queueRenderPage(pageNum);
             }
         });
 
-        // Keyboard Shortcuts and Enter key for page navigation
         document.addEventListener('keydown', (e) => {
             const viewer = document.getElementById('pdfViewerContainer');
             if (viewer.style.display === 'flex') {
@@ -700,18 +732,16 @@ function getBookCover($title) {
             }
         });
 
-        // Input event to track typing (no render)
         const pageInput = document.getElementById('pageInput');
         pageInput.addEventListener('input', () => {
             console.log('Manual input:', pageInput.value);
         });
 
-        // Real-time hit update function
         function updateHits() {
             fetch(window.location.href + '?get_hits=true')
                 .then(response => response.json())
                 .then(hits => {
-                    console.log('Fetched hits:', hits); // Debug log
+                    console.log('Fetched hits:', hits);
                     const books = document.querySelectorAll('.book');
                     books.forEach(book => {
                         const filePath = book.getAttribute('data-file-path');
@@ -728,10 +758,7 @@ function getBookCover($title) {
                 .catch(error => console.error('Error fetching hits:', error));
         }
 
-        // Start real-time updates (every 5 seconds)
         setInterval(updateHits, 5000);
-
-        // Initial update on page load
         window.addEventListener('load', updateHits);
     </script>
 </body>
