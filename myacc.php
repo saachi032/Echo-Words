@@ -69,6 +69,7 @@ $bookStmt->close();
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 2px;
+            text-decoration: none;
             color: white;
         }
         nav {
