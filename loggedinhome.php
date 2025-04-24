@@ -165,7 +165,7 @@ function getBookCover($title) {
         }
         .search-section {
             text-align: center;
-            margin-top: 175px;
+            margin-top: 20px;
         }
         .search-section input {
             width: 50%;
