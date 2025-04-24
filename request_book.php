@@ -81,7 +81,7 @@ session_start();
             background: #cc0000;
         }
         .form-container {
-            margin-top: 280px;
+            margin-top: 200px;
             background: rgba(255, 255, 255, 0.1);
             padding: 40px;
             border-radius: 20px;
