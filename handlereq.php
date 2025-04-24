@@ -8,6 +8,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $fileName = basename($_FILES["cover"]["name"]);
     $targetFile = $targetDir . time() . "_" . $fileName;
     $uploadOk = 1;
+    $email = $_SESSION["email"]; // add this line
 
     $fileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
     $allowedTypes = ['jpg', 'jpeg', 'png', 'gif'];
@@ -23,8 +24,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             die("Connection failed: " . $conn->connect_error);
         }
 
-        $stmt = $conn->prepare("INSERT INTO bookreq (book_name, author, cover_path) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $bookName, $author, $targetFile);
+        
+        // Modify the INSERT query
+        $stmt = $conn->prepare("INSERT INTO bookreq (book_name, author, cover_path, email) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("ssss", $bookName, $author, $targetFile, $email);
         $stmt->execute();
         $stmt->close();
         $conn->close();

@@ -1,21 +1,34 @@
 <?php
 session_start();
-if (!isset($_SESSION["user"]) || !isset($_SESSION["email"])) {
+if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit();
 }
 
-include 'db.php';
+$email = $_SESSION['email'];
+$mysqli = new mysqli("localhost", "root", "", "echowords");
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error);
+}
 
-$email = $_SESSION["email"];
+// Fetch user details
+$userStmt = $mysqli->prepare("SELECT fname, lname, phno FROM user WHERE email = ?");
+$userStmt->bind_param("s", $email);
+$userStmt->execute();
+$userStmt->bind_result($fname, $lname, $phno);
+$userStmt->fetch();
+$userStmt->close();
 
-$query = "SELECT fname, lname, email, phno FROM user WHERE email=?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("s", $email);
-$stmt->execute();
-$stmt->bind_result($fname, $lname, $email, $phno);
-$stmt->fetch();
-$stmt->close();
+// Fetch requested books
+$bookStmt = $mysqli->prepare("SELECT book_name, cover_path FROM bookreq WHERE email = ?");
+$bookStmt->bind_param("s", $email);
+$bookStmt->execute();
+$bookResult = $bookStmt->get_result();
+$books = [];
+while ($row = $bookResult->fetch_assoc()) {
+    $books[] = $row;
+}
+$bookStmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -28,7 +41,6 @@ $stmt->close();
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
-
         body {
             font-family: 'Poppins', sans-serif;
             margin: 0;
@@ -39,35 +51,29 @@ $stmt->close();
             flex-direction: column;
             align-items: center;
         }
-
         header {
-    width: 95%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(0, 0, 50, 0.9);
-    padding: 30px 50px;
-    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 1000;
-}
-
-.logo {
-    font-size: 50px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: white;
-    text-decoration: none;
-}
-
-
+            width: 95%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 50, 0.9);
+            padding: 30px 50px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3);
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .logo {
+            font-size: 50px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: white;
+        }
         nav {
             max-width: 50%;
         }
-
         nav ul {
             list-style: none;
             display: flex;
@@ -75,21 +81,18 @@ $stmt->close();
             padding: 0;
             margin: 0;
         }
-
         nav ul li a {
             color: white;
             text-decoration: none;
             font-weight: 600;
             font-size: 16px;
             transition: color 0.3s ease;
-            /* padding: 10px 20px; */
+            padding: 10px 20px;
             border-radius: 5px;
         }
-
         nav ul li a:hover {
             color: #ffcc00;
         }
-
         .logout-btn {
             padding: 10px 20px;
             background: #ff4444;
@@ -113,27 +116,23 @@ $stmt->close();
             margin-top: 150px;
             text-align: center;
         }
-
         .account-info h2 {
             font-size: 36px;
             font-weight: bold;
             color: #ffcc00;
             margin-bottom: 10px;
         }
-
         .account-info p {
             font-size: 20px;
             font-weight: 500;
             color: white;
             margin: 8px 0;
         }
-
         .stats {
             display: flex;
             justify-content: space-around;
             margin-top: 20px;
         }
-
         .stat-box {
             background: rgba(255, 255, 255, 0.2);
             padding: 20px;
@@ -141,17 +140,14 @@ $stmt->close();
             text-align: center;
             width: 30%;
         }
-
         .stat-box h3 {
             font-size: 22px;
             color: #ffcc00;
         }
-
         .stat-box p {
             font-size: 20px;
             font-weight: bold;
         }
-
         .book-list {
             display: flex;
             flex-wrap: wrap;
@@ -159,7 +155,6 @@ $stmt->close();
             justify-content: center;
             margin-top: 20px;
         }
-
         .book {
             background: rgba(255, 255, 255, 0.1);
             padding: 10px;
@@ -168,13 +163,11 @@ $stmt->close();
             text-align: center;
             width: 120px;
         }
-
         .book img {
             width: 100px;
             height: auto;
             border-radius: 5px;
         }
-
         .chart-container {
             margin-top: 30px;
             background: rgba(255, 255, 255, 0.2);
@@ -186,11 +179,10 @@ $stmt->close();
 <body>
     <header>
     <a href="loggedinhome.php" class="logo">EchoWords</a>
-        <nav>
+    <nav>
             <ul>
-                <!-- <li><a href="loggedinhome.php">Home</a></li> -->
                 <li><a href="myacc.php">My Account</a></li>
-                <li><a href="request_book.php">Request a Book</a></li>
+                <li><a href="request_book.php">Request Book</a></li>
                 <li><a href="logout.php" class="logout-btn">Logout</a></li>
             </ul>
         </nav>
@@ -219,11 +211,18 @@ $stmt->close();
             </div>
         </div>
 
-        <h2>Books Read</h2>
+        <h2>Books Requested</h2>
         <div class="book-list">
-            <div class="book"><img src="https://m.media-amazon.com/images/I/81YOuOGFCJL.jpg" alt="Harry Potter">Harry Potter</div>
-            <div class="book"><img src="https://m.media-amazon.com/images/I/71aFt4+OTOL.jpg" alt="The Alchemist">The Alchemist</div>
-            <div class="book"><img src="https://m.media-amazon.com/images/I/91OINeHnJGL.jpg" alt="Chamber of Secrets">Chamber of Secrets</div>
+            <?php if (count($books) === 0): ?>
+                <p>No books found.</p>
+            <?php else: ?>
+                <?php foreach ($books as $book): ?>
+                    <div class="book">
+                        <img src="<?php echo htmlspecialchars($book['cover_path']); ?>" alt="<?php echo htmlspecialchars($book['book_name']); ?>">
+                        <?php echo htmlspecialchars($book['book_name']); ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
 
         <div class="chart-container">

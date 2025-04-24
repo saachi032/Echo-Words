@@ -27,6 +27,7 @@ if (isset($_SESSION["user"]) && isset($_SESSION["email"])) {
     }
     $stmt->close();
 
+    date_default_timezone_set('Asia/Kolkata');
     // Determine greeting based on current hour
     $hour = (int)date('H');
     if ($hour >= 0 && $hour < 12) {
@@ -469,7 +470,7 @@ function getBookCover($title) {
                         <p class="book-title"><?= htmlspecialchars($book['title']) ?></p>
                         <p class="hits" data-file-path="<?= htmlspecialchars($book['file_path']) ?>">Hits: <?= htmlspecialchars($book['hits']) ?></p>
                     </div>
-                <?php endforeach; ?>
+                <?php endforeach; ?>    
             </div>
             <div class="no-results" id="noResults">No results found</div>
         </section>
